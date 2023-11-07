@@ -1,30 +1,60 @@
+"use client";
+
+import queryString from "query-string";
+import { useEffect, useState } from "react";
+
+import { useParamsStore } from "@/hooks/useParamsStore";
 import { Auction, PagedResult } from "@/types";
-import AuctionCard from "./AuctionCard";
+import { getData } from "../actions/auctionActions";
 import AppPagination from "../components/AppPagination";
+import AuctionCard from "./AuctionCard";
+import Filters from "./Filters";
+import EmptyFilter from "../components/EmptyFilter";
 
-async function getData(): Promise<PagedResult<Auction>> {
-    const res = await fetch("http://localhost:6001/search?pageSize=4");
+export default function Listings() {
+    const [data, setData] = useState<PagedResult<Auction>>();
+    const params = useParamsStore((state) => ({
+        pageNumber: state.pageNumber,
+        pageSize: state.pageSize,
+        searchTerm: state.searchTerm,
+        orderBy: state.orderBy,
+        filterBy: state.filterBy,
+    }));
 
-    if (!res.ok) {
-        throw new Error("Failed to fetch");
-    }
+    const setParams = useParamsStore((state) => state.setParams);
+    const url = queryString.stringifyUrl({ url: "", query: params });
 
-    return res.json();
-}
+    const setPageNumber = (pageNumber: number) => setParams({ pageNumber });
 
-export default async function Listings() {
-    const data = await getData();
+    useEffect(() => {
+        getData(url).then((data) => {
+            setData(data);
+        });
+    }, [url]);
+
+    if (!data) return <h3>Loading...</h3>;
 
     return (
         <>
-            <div className="grid grid-cols-4 gap-6">
-                {data?.results?.map((auction) => (
-                    <AuctionCard key={auction.id} auction={auction} />
-                ))}
-            </div>
-            <div className="flex justify-center mt-4">
-                <AppPagination currentPage={1} pageCount={data.pageCount} />
-            </div>
+            <Filters />
+            {data.totalCount === 0 ? (
+                <EmptyFilter showReset />
+            ) : (
+                <>
+                    <div className="grid grid-cols-4 gap-6">
+                        {data.results?.map((auction) => (
+                            <AuctionCard key={auction.id} auction={auction} />
+                        ))}
+                    </div>
+                    <div className="flex justify-center mt-4">
+                        <AppPagination
+                            currentPage={params.pageNumber}
+                            pageCount={data.pageCount}
+                            pageChanged={setPageNumber}
+                        />
+                    </div>
+                </>
+            )}
         </>
     );
 }
